@@ -117,7 +117,7 @@ func waitForSession(done <-chan struct{}, session ongoingSession, execCmd string
 		}, &result)
 
 		if err != nil {
-			// Session may have been deleted or we lost connectivity — stop watching it
+			fmt.Fprintf(os.Stderr, "Warning: waitFor %s failed: %v\n", session.ID, err)
 			return
 		}
 
@@ -147,9 +147,16 @@ func runExecCommand(command string, session ongoingSession) {
 		"CLUELY_SESSION_TITLE="+titleOrEmpty(session.Title),
 	)
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "exec error: %v\n", err)
+		return
 	}
+	// Don't block — let it run in the background
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			fmt.Fprintf(os.Stderr, "exec error: %v\n", err)
+		}
+	}()
 }
 
 func titleOrEmpty(t *string) string {
