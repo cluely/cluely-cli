@@ -1,0 +1,25 @@
+# Binaries
+bin/
+dist/
+cluely
+cluely.exe
+
+# Go
+*.test
+*.out
+*.prof
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local

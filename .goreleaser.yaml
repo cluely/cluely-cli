@@ -1,0 +1,50 @@
+version: 2
+project_name: cluely
+
+builds:
+  - main: .
+    binary: cluely
+    ldflags:
+      - -s -w
+      - -X github.com/cluely/cli/internal/version.Version={{.Version}}
+      - -X github.com/cluely/cli/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/cluely/cli/internal/version.Date={{.Date}}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+brews:
+  - repository:
+      owner: cluely
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://cluely.com"
+    description: "CLI for the Cluely platform"
+    install: |
+      bin.install "cluely"
+    test: |
+      system "#{bin}/cluely", "--version"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
