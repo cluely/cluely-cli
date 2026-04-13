@@ -1,6 +1,14 @@
-# Cluely CLI
-
-Command-line interface for the [Cluely](https://cluely.com) platform. Manage your meeting sessions, transcripts, and insights from the terminal.
+<div align="center">
+<br>
+<img src="assets/banner.png" alt="Cluely" width="600">
+<br><br>
+<p><strong>Command-line interface for the <a href="https://cluely.com">Cluely</a> platform.</strong></p>
+<p>Manage your meeting sessions, transcripts, and insights from the terminal.</p>
+<a href="https://github.com/cluely/cluely-cli/releases/latest"><img src="https://img.shields.io/github/v/release/cluely/cluely-cli" alt="Release"></a>
+<a href="https://github.com/cluely/cluely-cli/actions"><img src="https://github.com/cluely/cluely-cli/actions/workflows/release.yml/badge.svg" alt="Build"></a>
+<a href="https://github.com/cluely/cluely-cli"><img src="https://img.shields.io/github/license/cluely/cluely-cli" alt="License"></a>
+<br><br>
+</div>
 
 ## Installation
 
