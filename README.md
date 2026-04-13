@@ -81,6 +81,8 @@ List and view meeting sessions. Aliased as `cluely s`.
 cluely sessions list                  # List recent sessions
 cluely sessions list -n 5             # Show only 5 sessions
 cluely sessions list --state finished # Filter by state
+cluely sessions list --since 24h      # Sessions from the last 24 hours
+cluely sessions list --since 7d       # Sessions from the last 7 days
 cluely sessions get <session-id>      # View session details and transcript
 ```
 
@@ -90,6 +92,29 @@ cluely sessions get <session-id>      # View session details and transcript
 cluely sessions list --json
 cluely sessions list --json | jq '.items[].title'
 cluely sessions get <session-id> --json
+```
+
+### `cluely sessions watch`
+
+Watch for sessions to finish in real time. Runs continuously until Ctrl+C.
+
+```bash
+cluely sessions watch                          # Print when sessions finish
+cluely sessions watch --exec "say done"        # Run a command on completion
+cluely sessions watch --exec "./process.sh"    # Run a script
+```
+
+The `--exec` command has access to these environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `CLUELY_SESSION_ID` | Session ID |
+| `CLUELY_SESSION_TITLE` | Session title (if available) |
+
+Example -- automatically export transcripts when sessions finish:
+
+```bash
+cluely sessions watch --exec "cluely sessions get \$CLUELY_SESSION_ID --json > ~/transcripts/\$CLUELY_SESSION_ID.json"
 ```
 
 ### `cluely completion`
