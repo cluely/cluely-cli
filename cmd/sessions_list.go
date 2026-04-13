@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -19,6 +21,7 @@ var sessionsListCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		cursor, _ := cmd.Flags().GetString("cursor")
 		state, _ := cmd.Flags().GetString("state")
+		since, _ := cmd.Flags().GetString("since")
 		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		input := map[string]interface{}{
@@ -29,6 +32,13 @@ var sessionsListCmd = &cobra.Command{
 		}
 		if state != "" {
 			input["state"] = state
+		}
+		if since != "" {
+			d, err := parseDuration(since)
+			if err != nil {
+				return fmt.Errorf("invalid --since value %q: %w (examples: 24h, 7d, 30m)", since, err)
+			}
+			input["createdAfter"] = time.Now().Add(-d).UTC().Format(time.RFC3339)
 		}
 
 		if jsonOut {
@@ -88,6 +98,7 @@ func init() {
 	sessionsListCmd.Flags().IntP("limit", "n", 20, "Number of sessions to show")
 	sessionsListCmd.Flags().String("cursor", "", "Pagination cursor for next page")
 	sessionsListCmd.Flags().String("state", "", "Filter by state (ongoing, analyzing, finished)")
+	sessionsListCmd.Flags().String("since", "", "Show sessions created in the last duration (e.g. 24h, 7d, 30m)")
 	sessionsCmd.AddCommand(sessionsListCmd)
 }
 
@@ -113,4 +124,31 @@ func prettyJSON(raw json.RawMessage) string {
 		return string(raw)
 	}
 	return string(buf)
+}
+
+// parseDuration parses a human-friendly duration string like "24h", "7d", "30m".
+// Supports: m (minutes), h (hours), d (days).
+func parseDuration(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if len(s) < 2 {
+		return 0, fmt.Errorf("too short")
+	}
+
+	unit := s[len(s)-1]
+	numStr := s[:len(s)-1]
+	num, err := strconv.Atoi(numStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid number %q", numStr)
+	}
+
+	switch unit {
+	case 'm':
+		return time.Duration(num) * time.Minute, nil
+	case 'h':
+		return time.Duration(num) * time.Hour, nil
+	case 'd':
+		return time.Duration(num) * 24 * time.Hour, nil
+	default:
+		return 0, fmt.Errorf("unknown unit %q, use m/h/d", string(unit))
+	}
 }
