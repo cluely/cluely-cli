@@ -10,8 +10,17 @@ import (
 	"time"
 
 	"github.com/cluely/cli/internal/api"
+	"github.com/cluely/cli/internal/color"
 	"github.com/spf13/cobra"
 )
+
+type sessionTag struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+var allColumns = []string{"id", "state", "title", "tags", "created"}
 
 var sessionsListCmd = &cobra.Command{
 	Use:   "list",
@@ -22,7 +31,12 @@ var sessionsListCmd = &cobra.Command{
 		cursor, _ := cmd.Flags().GetString("cursor")
 		state, _ := cmd.Flags().GetString("state")
 		since, _ := cmd.Flags().GetString("since")
+		tag, _ := cmd.Flags().GetString("tag")
 		jsonOut, _ := cmd.Flags().GetBool("json")
+		fields, _ := cmd.Flags().GetString("fields")
+		noFields, _ := cmd.Flags().GetString("no-fields")
+
+		columns := resolveColumns(fields, noFields)
 
 		input := map[string]interface{}{
 			"limit": limit,
@@ -40,6 +54,9 @@ var sessionsListCmd = &cobra.Command{
 			}
 			input["createdAfter"] = time.Now().Add(-d).UTC().Format(time.RFC3339)
 		}
+		if tag != "" {
+			input["tagIds"] = []string{tag}
+		}
 
 		if jsonOut {
 			raw, err := api.CallRaw("sessions/list", input)
@@ -52,11 +69,12 @@ var sessionsListCmd = &cobra.Command{
 
 		var result struct {
 			Items []struct {
-				ID        string  `json:"id"`
-				State     string  `json:"state"`
-				Title     *string `json:"title"`
-				CreatedAt string  `json:"createdAt"`
-				EndedAt   *string `json:"endedAt"`
+				ID        string       `json:"id"`
+				State     string       `json:"state"`
+				Title     *string      `json:"title"`
+				Tags      []sessionTag `json:"tags"`
+				CreatedAt string       `json:"createdAt"`
+				EndedAt   *string      `json:"endedAt"`
 			} `json:"items"`
 			NextCursor *string `json:"nextCursor"`
 			Total      int     `json:"total"`
@@ -71,16 +89,32 @@ var sessionsListCmd = &cobra.Command{
 			return nil
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintf(w, "ID\tSTATE\tTITLE\tCREATED\n")
+		show := func(col string) bool { return columns[col] }
 
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+
+		// Header
+		var hdr []string
+		if show("id") { hdr = append(hdr, "ID") }
+		if show("state") { hdr = append(hdr, "STATE") }
+		if show("title") { hdr = append(hdr, "TITLE") }
+		if show("tags") { hdr = append(hdr, "TAGS") }
+		if show("created") { hdr = append(hdr, "CREATED") }
+		fmt.Fprintln(w, strings.Join(hdr, "\t"))
+
+		// Rows
 		for _, s := range result.Items {
-			title := "-"
-			if s.Title != nil {
-				title = truncate(*s.Title, 50)
+			var row []string
+			if show("id") { row = append(row, s.ID) }
+			if show("state") { row = append(row, s.State) }
+			if show("title") {
+				t := "-"
+				if s.Title != nil { t = truncate(*s.Title, 50) }
+				row = append(row, t)
 			}
-			created := formatTime(s.CreatedAt)
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.ID, s.State, title, created)
+			if show("tags") { row = append(row, formatTags(s.Tags)) }
+			if show("created") { row = append(row, formatTime(s.CreatedAt)) }
+			fmt.Fprintln(w, strings.Join(row, "\t"))
 		}
 		w.Flush()
 
@@ -99,7 +133,44 @@ func init() {
 	sessionsListCmd.Flags().String("cursor", "", "Pagination cursor for next page")
 	sessionsListCmd.Flags().String("state", "", "Filter by state (ongoing, analyzing, finished)")
 	sessionsListCmd.Flags().String("since", "", "Show sessions created in the last duration (e.g. 24h, 7d, 30m)")
+	sessionsListCmd.Flags().String("tag", "", "Filter by tag ID")
+	sessionsListCmd.Flags().String("fields", "", "Comma-separated columns to show (e.g. id,title,tags)")
+	sessionsListCmd.Flags().String("no-fields", "", "Comma-separated columns to hide (e.g. tags,state)")
 	sessionsCmd.AddCommand(sessionsListCmd)
+}
+
+// resolveColumns returns the set of columns to display.
+// --fields includes only those columns, --no-fields excludes them from the default set.
+func resolveColumns(fields, noFields string) map[string]bool {
+	cols := map[string]bool{}
+
+	if fields != "" {
+		for _, f := range strings.Split(fields, ",") {
+			cols[strings.TrimSpace(f)] = true
+		}
+		return cols
+	}
+
+	for _, c := range allColumns {
+		cols[c] = true
+	}
+	if noFields != "" {
+		for _, f := range strings.Split(noFields, ",") {
+			delete(cols, strings.TrimSpace(f))
+		}
+	}
+	return cols
+}
+
+func formatTags(tags []sessionTag) string {
+	if len(tags) == 0 {
+		return "-"
+	}
+	parts := make([]string, len(tags))
+	for i, t := range tags {
+		parts[i] = color.TagBadge(t.Name, t.Color)
+	}
+	return strings.Join(parts, " ")
 }
 
 func truncate(s string, max int) string {
@@ -126,8 +197,6 @@ func prettyJSON(raw json.RawMessage) string {
 	return string(buf)
 }
 
-// parseDuration parses a human-friendly duration string like "24h", "7d", "30m".
-// Supports: m (minutes), h (hours), d (days).
 func parseDuration(s string) (time.Duration, error) {
 	s = strings.TrimSpace(s)
 	if len(s) < 2 {

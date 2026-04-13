@@ -18,6 +18,7 @@
   - [cluely auth](#cluely-auth)
   - [cluely sessions](#cluely-sessions)
   - [cluely sessions watch](#cluely-sessions-watch)
+  - [cluely tags](#cluely-tags)
   - [cluely daemon](#cluely-daemon)
   - [cluely completion](#cluely-completion)
 - [Exit codes](#exit-codes)
@@ -95,13 +96,42 @@ cluely auth status    # Check if you're logged in
 List and view meeting sessions. Aliased as `cluely s`.
 
 ```
-cluely sessions list                  # List recent sessions
-cluely sessions list -n 5             # Show only 5 sessions
-cluely sessions list --state finished # Filter by state
-cluely sessions list --since 24h      # Sessions from the last 24 hours
-cluely sessions list --since 7d       # Sessions from the last 7 days
-cluely sessions get <session-id>      # View session details and transcript
+cluely sessions list                   # List recent sessions
+cluely sessions list -n 5              # Show only 5 sessions
+cluely sessions list --state finished  # Filter by state
+cluely sessions list --since 24h       # Sessions from the last 24 hours
+cluely sessions list --since 7d        # Sessions from the last 7 days
+cluely sessions list --tag <tag-id>    # Filter by tag
+cluely sessions get <session-id>       # View session details and transcript
 ```
+
+Sessions and their tags are displayed with colored badges in the terminal.
+
+**Tagging sessions:**
+
+```bash
+cluely sessions tag <session-id> <tag-id>      # Add a tag to a session
+cluely sessions untag <session-id> <tag-id>    # Remove a tag from a session
+```
+
+**Field filtering** -- control which columns/sections are displayed:
+
+```bash
+# List: show only specific columns
+cluely sessions list --fields id,title,tags
+
+# List: hide specific columns
+cluely sessions list --no-fields tags,state
+
+# Get: show only summary and transcript
+cluely sessions get <session-id> --fields summary,transcript
+
+# Get: hide the transcript
+cluely sessions get <session-id> --no-fields transcript
+```
+
+List columns: `id`, `state`, `title`, `tags`, `created`.
+Get sections: `id`, `title`, `state`, `created`, `ended`, `tags`, `attendees`, `summary`, `transcript`.
 
 **JSON output** -- add `--json` to get raw JSON, useful for scripting and piping:
 
@@ -136,6 +166,23 @@ Example -- automatically export transcripts when sessions finish:
 
 ```bash
 cluely sessions watch --on end --exec "cluely sessions get \$CLUELY_SESSION_ID --json > ~/transcripts/\$CLUELY_SESSION_ID.json"
+```
+
+### `cluely tags`
+
+Create, list, and delete tags for organizing sessions. Aliased as `cluely t`. Tags are displayed as colored badges throughout the CLI.
+
+```bash
+cluely tags list                                    # List all tags
+cluely tags create "Sales Call" --color "#4f46e5"   # Create a tag with a color
+cluely tags create "Interview" --color "#059669"    # Colors are hex values
+cluely tags delete <tag-id>                         # Delete a tag
+```
+
+Tags support `--json` output:
+
+```bash
+cluely tags list --json
 ```
 
 ### `cluely daemon`
