@@ -11,36 +11,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ongoingSession struct {
+type watchSession struct {
 	ID    string  `json:"id"`
 	Title *string `json:"title"`
 }
 
 var sessionsWatchCmd = &cobra.Command{
 	Use:   "watch",
-	Short: "Watch for session completions",
-	Long: `Watch for sessions to finish and optionally run a command.
+	Short: "Watch for session events",
+	Long: `Watch for session starts and completions, optionally running a command for each event.
 
-Runs continuously until interrupted with Ctrl+C. When a session finishes,
-prints its info and runs the --exec command if provided.
+Runs continuously until interrupted with Ctrl+C.
 
 The --exec command has access to these environment variables:
+  CLUELY_EVENT           Event type: "start" or "end"
   CLUELY_SESSION_ID      Session ID
   CLUELY_SESSION_TITLE   Session title (if available)`,
 	Example: `  cluely sessions watch
-  cluely sessions watch --exec "echo \$CLUELY_SESSION_TITLE finished"
-  cluely sessions watch --exec "cluely sessions get \$CLUELY_SESSION_ID --json | ./process.sh"`,
+  cluely sessions watch --exec "echo \$CLUELY_EVENT: \$CLUELY_SESSION_TITLE"
+  cluely sessions watch --on end --exec "./on-complete.sh"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		execCmd, _ := cmd.Flags().GetString("exec")
+		onFilter, _ := cmd.Flags().GetString("on")
 		done := cmd.Context().Done()
 
-		fmt.Println("Watching for session completions... (Ctrl+C to stop)")
+		if onFilter != "" && onFilter != "start" && onFilter != "end" {
+			return fmt.Errorf("--on must be 'start' or 'end'")
+		}
 
-		// Track sessions we're already watching to avoid duplicates
+		fmt.Println("Watching for session events... (Ctrl+C to stop)")
+
 		watching := map[string]bool{}
 
 		for {
-			// Fetch ongoing sessions
 			ongoing, err := fetchOngoingSessions()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to fetch sessions: %v\n", err)
@@ -52,25 +55,26 @@ The --exec command has access to these environment variables:
 				}
 			}
 
-			// Start watching new sessions
 			for _, s := range ongoing {
 				if watching[s.ID] {
 					continue
 				}
 				watching[s.ID] = true
-				title := "(untitled)"
-				if s.Title != nil {
-					title = *s.Title
-				}
-				fmt.Printf("Watching session: %s — %s\n", s.ID, title)
 
-				go func(session ongoingSession) {
-					waitForSession(done, session, execCmd)
+				fmt.Printf("Session started: %s — %s\n", s.ID, titleDisplay(s.Title))
+
+				if onFilter == "" || onFilter == "start" {
+					if execCmd != "" {
+						runExecCommand(execCmd, s, "start")
+					}
+				}
+
+				go func(session watchSession) {
+					waitForSession(done, session, execCmd, onFilter)
 					delete(watching, session.ID)
 				}(s)
 			}
 
-			// Wait before re-checking for new sessions
 			select {
 			case <-done:
 				return nil
@@ -81,13 +85,14 @@ The --exec command has access to these environment variables:
 }
 
 func init() {
-	sessionsWatchCmd.Flags().String("exec", "", "Command to run when a session finishes")
+	sessionsWatchCmd.Flags().String("exec", "", "Command to run on session events")
+	sessionsWatchCmd.Flags().String("on", "", "Filter events: 'start' or 'end' (default: both)")
 	sessionsCmd.AddCommand(sessionsWatchCmd)
 }
 
-func fetchOngoingSessions() ([]ongoingSession, error) {
+func fetchOngoingSessions() ([]watchSession, error) {
 	var result struct {
-		Items []ongoingSession `json:"items"`
+		Items []watchSession `json:"items"`
 	}
 	input := map[string]interface{}{
 		"limit": 50,
@@ -99,8 +104,7 @@ func fetchOngoingSessions() ([]ongoingSession, error) {
 	return result.Items, nil
 }
 
-// waitForSession calls the waitFor endpoint in a loop until the session finishes.
-func waitForSession(done <-chan struct{}, session ongoingSession, execCmd string) {
+func waitForSession(done <-chan struct{}, session watchSession, execCmd, onFilter string) {
 	for {
 		select {
 		case <-done:
@@ -122,27 +126,24 @@ func waitForSession(done <-chan struct{}, session ongoingSession, execCmd string
 		}
 
 		if result.Status == "fulfilled" {
-			title := "(untitled)"
-			if session.Title != nil {
-				title = *session.Title
-			}
-			fmt.Printf("Session finished: %s — %s\n", session.ID, title)
+			fmt.Printf("Session ended: %s — %s\n", session.ID, titleDisplay(session.Title))
 
-			if execCmd != "" {
-				runExecCommand(execCmd, session)
+			if onFilter == "" || onFilter == "end" {
+				if execCmd != "" {
+					runExecCommand(execCmd, session, "end")
+				}
 			}
 			return
 		}
-
-		// timed-out: loop and try again
 	}
 }
 
-func runExecCommand(command string, session ongoingSession) {
+func runExecCommand(command string, session watchSession, event string) {
 	cmd := exec.Command("sh", "-c", command)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(),
+		"CLUELY_EVENT="+event,
 		"CLUELY_SESSION_ID="+session.ID,
 		"CLUELY_SESSION_TITLE="+titleOrEmpty(session.Title),
 	)
@@ -151,7 +152,6 @@ func runExecCommand(command string, session ongoingSession) {
 		fmt.Fprintf(os.Stderr, "exec error: %v\n", err)
 		return
 	}
-	// Don't block — let it run in the background
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			fmt.Fprintf(os.Stderr, "exec error: %v\n", err)
@@ -164,4 +164,11 @@ func titleOrEmpty(t *string) string {
 		return strings.TrimSpace(*t)
 	}
 	return ""
+}
+
+func titleDisplay(t *string) string {
+	if t != nil && strings.TrimSpace(*t) != "" {
+		return strings.TrimSpace(*t)
+	}
+	return "(untitled)"
 }

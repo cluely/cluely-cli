@@ -10,6 +10,20 @@
 <br><br>
 </div>
 
+## Table of contents
+
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Commands](#commands)
+  - [cluely auth](#cluely-auth)
+  - [cluely sessions](#cluely-sessions)
+  - [cluely sessions watch](#cluely-sessions-watch)
+  - [cluely daemon](#cluely-daemon)
+  - [cluely completion](#cluely-completion)
+- [Exit codes](#exit-codes)
+- [Updating](#updating)
+- [License](#license)
+
 ## Installation
 
 ### Homebrew (macOS and Linux)
@@ -59,6 +73,9 @@ cluely sessions list
 
 # View a specific session with transcript
 cluely sessions get <session-id>
+
+# Watch for sessions to finish and run a script
+cluely daemon start --exec "./on-complete.sh"
 ```
 
 ## Commands
@@ -96,26 +113,51 @@ cluely sessions get <session-id> --json
 
 ### `cluely sessions watch`
 
-Watch for sessions to finish in real time. Runs continuously until Ctrl+C.
+Watch for session starts and completions in real time. Runs in the foreground until Ctrl+C.
 
 ```bash
-cluely sessions watch                          # Print when sessions finish
-cluely sessions watch --exec "say done"        # Run a command on completion
-cluely sessions watch --exec "./process.sh"    # Run a script
+cluely sessions watch                                                    # Print all events
+cluely sessions watch --exec "echo \$CLUELY_EVENT: \$CLUELY_SESSION_TITLE"  # Run on every event
+cluely sessions watch --on end --exec "./on-complete.sh"                 # Only on session end
+cluely sessions watch --on start --exec "notify-send 'Meeting started'"  # Only on session start
 ```
 
 The `--exec` command has access to these environment variables:
 
 | Variable | Description |
 |----------|-------------|
+| `CLUELY_EVENT` | Event type: `start` or `end` |
 | `CLUELY_SESSION_ID` | Session ID |
 | `CLUELY_SESSION_TITLE` | Session title (if available) |
+
+Use `--on` to filter which events trigger the command (`start`, `end`, or both by default).
 
 Example -- automatically export transcripts when sessions finish:
 
 ```bash
-cluely sessions watch --exec "cluely sessions get \$CLUELY_SESSION_ID --json > ~/transcripts/\$CLUELY_SESSION_ID.json"
+cluely sessions watch --on end --exec "cluely sessions get \$CLUELY_SESSION_ID --json > ~/transcripts/\$CLUELY_SESSION_ID.json"
 ```
+
+### `cluely daemon`
+
+Run the session watcher as a persistent background service. Uses launchd on macOS and systemd on Linux. The service auto-restarts on failure and runs on login.
+
+```bash
+# Start the service
+cluely daemon start --exec "./on-complete.sh"
+
+# Check if it's running
+cluely daemon status
+
+# View logs
+cluely daemon logs
+cluely daemon logs -f    # Follow mode (like tail -f)
+
+# Stop and remove the service
+cluely daemon stop
+```
+
+Logs are written to `~/.config/cluely/logs/watch.log`.
 
 ### `cluely completion`
 
