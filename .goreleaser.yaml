@@ -31,6 +31,7 @@ brews:
       owner: cluely
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: "https://cluely.com"
     description: "CLI for the Cluely platform"
     install: |
