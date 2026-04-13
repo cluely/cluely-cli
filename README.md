@@ -107,6 +107,15 @@ cluely sessions get <session-id>       # View session details and transcript
 
 Sessions and their tags are displayed with colored badges in the terminal.
 
+**Updating and deleting sessions:**
+
+```bash
+cluely sessions update <session-id> --title "Q2 Planning"                    # Update title
+cluely sessions update <session-id> --summary "Discussed roadmap priorities"  # Update summary
+cluely sessions update <session-id> --title "Standup" --summary "Quick sync"  # Both at once
+cluely sessions delete <session-id>                                           # Delete a session
+```
+
 **Tagging sessions:**
 
 ```bash
