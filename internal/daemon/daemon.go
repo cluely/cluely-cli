@@ -171,7 +171,7 @@ func extractExecFromPlist(plist string) string {
 	rest := plist[idx+len(marker):]
 	start := strings.Index(rest, "<string>")
 	end := strings.Index(rest, "</string>")
-	if start == -1 || end == -1 {
+	if start == -1 || end == -1 || end < start+len("<string>") {
 		return ""
 	}
 	return rest[start+len("<string>") : end]
