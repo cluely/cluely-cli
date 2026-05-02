@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cluely/cli/internal/api"
@@ -41,6 +42,7 @@ The --exec command has access to these environment variables:
 
 		fmt.Println("Watching for session events... (Ctrl+C to stop)")
 
+		var mu sync.Mutex
 		watching := map[string]bool{}
 
 		for {
@@ -56,10 +58,16 @@ The --exec command has access to these environment variables:
 			}
 
 			for _, s := range ongoing {
-				if watching[s.ID] {
+				mu.Lock()
+				alreadyWatching := watching[s.ID]
+				if !alreadyWatching {
+					watching[s.ID] = true
+				}
+				mu.Unlock()
+
+				if alreadyWatching {
 					continue
 				}
-				watching[s.ID] = true
 
 				fmt.Printf("Session started: %s — %s\n", s.ID, titleDisplay(s.Title))
 
@@ -71,7 +79,9 @@ The --exec command has access to these environment variables:
 
 				go func(session watchSession) {
 					waitForSession(done, session, execCmd, onFilter)
+					mu.Lock()
 					delete(watching, session.ID)
+					mu.Unlock()
 				}(s)
 			}
 
