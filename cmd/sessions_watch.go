@@ -59,15 +59,12 @@ The --exec command has access to these environment variables:
 
 			for _, s := range ongoing {
 				mu.Lock()
-				alreadyWatching := watching[s.ID]
-				if !alreadyWatching {
-					watching[s.ID] = true
-				}
-				mu.Unlock()
-
-				if alreadyWatching {
+				if watching[s.ID] {
+					mu.Unlock()
 					continue
 				}
+				watching[s.ID] = true
+				mu.Unlock()
 
 				fmt.Printf("Session started: %s — %s\n", s.ID, titleDisplay(s.Title))
 

@@ -7,6 +7,11 @@ import (
 )
 
 func TestFull(t *testing.T) {
+	origVersion, origCommit, origDate := Version, Commit, Date
+	t.Cleanup(func() {
+		Version, Commit, Date = origVersion, origCommit, origDate
+	})
+
 	t.Run("returns formatted version string", func(t *testing.T) {
 		Version = "1.2.3"
 		Commit = "abc1234"

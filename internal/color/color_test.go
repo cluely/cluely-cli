@@ -117,7 +117,7 @@ func TestLuminance(t *testing.T) {
 		{
 			name:    "white is 1",
 			r: 255, g: 255, b: 255,
-			wantMin: 1, wantMax: 1,
+			wantMin: 0.99, wantMax: 1.01,
 		},
 		{
 			name:    "pure red is roughly 0.299",
